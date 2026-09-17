@@ -99,7 +99,10 @@ pythia8 :
 #           script must instead read the event count from the card itself (see its comments).
 #   stage2: ddsim runs the full Geant4 simulation over those generator-level events against
 #           the card_<>.xml CLD DD4hep detector model, using the ddsim_<>.py steering file
-#           (CLDConfig's cld_steer.py).
+#           (CLDConfig's cld_steer.py). No -N/--numberOfEvents is passed here either: like
+#           stage1's -n, "-1" ("all events") throws "reading beyond bounds" for the EDM4hep
+#           generator-input reader instead of stopping cleanly at end-of-file. The steering
+#           script must read the actual event count from the input file itself.
 #   stage3: k4run_cld_reco_<?>.py (CLDConfig's CLDReconstruction.py) reconstructs the simulated events
 #           against the same card_<>.xml detector model. It depends on sibling files (py_utils.py,
 #           Tracking/, PandoraSettingsCLD/, ...) that cp_sandbox_files symlinks in from the
@@ -115,7 +118,7 @@ pythia8_fullsim :
       - ().root
     output_file: genevents.root
   stage2:
-    cmd : ddsim -I {0} -N -1 -O {1} --compactFile $(readlink -f {2}) --steeringFile {3}
+    cmd : ddsim -I {0} -O {1} --compactFile $(readlink -f {2}) --steeringFile {3}
     args:
       - --
       - ().root
