@@ -93,7 +93,10 @@ pythia8 :
 #           the key4hep k4Gen Pythia8 example) that generates Pythia8 events and writes them
 #           to an EDM4hep ROOT file. The datatype's ++.cmd pythia8 card is passed via the
 #           --Pythia8.PythiaInterface.pythiacard override (the instance names must match
-#           those used in k4run_pythia8_<>.py).
+#           those used in k4run_pythia8_<>.py). No -n/--num-events is passed here: it sets
+#           ApplicationMgr().EvtMax directly (unrelated to the card's Main:numberOfEvents),
+#           and -1 means "unlimited" for a generator, which never terminates. The steering
+#           script must instead read the event count from the card itself (see its comments).
 #   stage2: ddsim runs the full Geant4 simulation over those generator-level events against
 #           the card_<>.xml CLD DD4hep detector model, using the ddsim_<>.py steering file
 #           (CLDConfig's cld_steer.py).
@@ -105,7 +108,7 @@ pythia8 :
 #           which cld_reco_rename_output renames to FLARE's expected output_file_name.
 pythia8_fullsim :
   stage1:
-    cmd : k4run {0} -n -1 --Pythia8.PythiaInterface.pythiacard {1} --out.filename {2}
+    cmd : k4run {0} --Pythia8.PythiaInterface.pythiacard {1} --out.filename {2}
     args:
       - k4run_pythia8_<>.py
       - ++.cmd
