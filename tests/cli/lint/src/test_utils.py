@@ -31,16 +31,15 @@ def python_script_as_string_and_ranges() -> tuple:
     for unparsed_range in unparsed_valid_ranges:
         # If it has .. indicates there are different start and end lines
         unparsed_range = unparsed_range.split("..")
-        # Use a match statement to breakdown our two options, 1 or 2
-        match len(unparsed_range):
-            case 1:
-                range = int(unparsed_range[0])
-                parsed_valid_ranges.append((range, range))
-            case 2:
-                start, end = tuple(map(int, unparsed_range))
-                parsed_valid_ranges.append((start, end))
-            case _:
-                continue
+        # Breakdown our two options, 1 or 2
+        if len(unparsed_range) == 1:
+            range = int(unparsed_range[0])
+            parsed_valid_ranges.append((range, range))
+        elif len(unparsed_range) == 2:
+            start, end = tuple(map(int, unparsed_range))
+            parsed_valid_ranges.append((start, end))
+        else:
+            continue
 
     return (file_contents, str(file_path), parsed_valid_ranges)
 

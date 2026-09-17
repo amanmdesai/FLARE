@@ -15,6 +15,12 @@ dependencies = [
     "pydantic>1",
 ]
 
+[dependency-groups]
+test = [
+    "pytest",
+    "pytest-mock",
+]
+
 [project.urls]
 Homepage = "https://github.com/CamCoop1/FLARE"
 

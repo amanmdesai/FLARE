@@ -12,13 +12,13 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v4
+            - name: Install uv
+              uses: astral-sh/setup-uv@v3
               with:
                   python-version: "3.11.9"
 
             - name: Install regular + test dependencies
-              run: pip install . pytest-mock
+              run: uv sync --locked --group test
 
             - name: Run tests
-              run: python3 -m pytest -W ignore::DeprecationWarning -s
+              run: uv run pytest -W ignore::DeprecationWarning -s
