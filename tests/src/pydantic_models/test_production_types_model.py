@@ -30,6 +30,7 @@ def test_valid_mc_production_model(default_stage_args):
             "whizard": {"stage1": default_stage_args},
             "madgraph": {"stage1": default_stage_args},
             "pythia8": {"stage1": default_stage_args},
+            "pythia8_fullsim": {"stage1": default_stage_args},
         }
     ).dict()
 
@@ -37,6 +38,9 @@ def test_valid_mc_production_model(default_stage_args):
     assert model["madgraph"]["stage1"]["args"] == default_stage_args["args"]
     assert (
         model["pythia8"]["stage1"]["output_file"] == default_stage_args["output_file"]
+    )
+    assert (
+        model["pythia8_fullsim"]["stage1"]["cmd"] == default_stage_args["cmd"]
     )
 
 
@@ -60,6 +64,7 @@ def test_mc_model_with_extra_field(default_stage_args):
                 "whizard": {"stage1": default_stage_args},
                 "madgraph": {"stage1": default_stage_args},
                 "pythia8": {"stage1": default_stage_args},
+                "pythia8_fullsim": {"stage1": default_stage_args},
                 "invalid": {},
             }
         ).dict()

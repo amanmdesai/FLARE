@@ -21,3 +21,4 @@ class MCProductionModel(ForbidExtraBaseModel):
     whizard: ProductionTypeBaseModel
     madgraph: ProductionTypeBaseModel
     pythia8: ProductionTypeBaseModel
+    pythia8_fullsim: ProductionTypeBaseModel

@@ -269,6 +269,46 @@ Where <> indicates areas where you can input your own naming conventions. The so
 - p8_ee_mumuH_Hbb_ecm240.cmd
 - p8_ee_mumuH_HWW_ecm240.cmd
 
+## Pythia8 (full simulation)
+
+**Note:** `pythia8_fullsim` runs a full Geant4/DD4hep simulation (via `k4run` + `ddsim`) instead of the
+parameterised Delphes response used by `pythia8` above. It produces simulated-hit EDM4hep output;
+digitisation/reconstruction is **not** included, so its output is not yet usable directly by `fccanalysis`
+the way `pythia8`'s Delphes output is.
+
+### details.yaml
+
+To select it, set `prodtype = pythia8_fullsim`. The same `.cmd` cards used for `pythia8` can be reused unchanged
+(the datatype naming rules are identical):
+
+``` yaml
+"$model" : "UserMCProdConfigModel"
+
+global_prodtype: pythia8_fullsim
+
+datatype:
+    - p8_ee_mumuH_Hbb_ecm240
+    - p8_ee_mumuH_HWW_ecm240
+```
+
+### Input Files
+
+To run the `pythia8_fullsim` workflow the following files must be located in `mc_production`:
+
+- `++.cmd` — the same per-datatype Pythia8 card used by `pythia8` (see above)
+- `k4run_pythia8_<>.py` — a k4run/Gaudi steering script that generates Pythia8 events and writes them to
+  an EDM4hep ROOT file. It must instantiate its Pythia8 generator algorithm/tool and output writer with the
+  same names as the [official key4hep k4Gen example](https://github.com/key4hep/k4Gen) (`GenAlg("Pythia8")`
+  wrapping a `PythiaInterface()`, and `PodioOutput("out")`), since FLARE drives the card path and output
+  filename via the `--Pythia8.PythiaInterface.pythiacard` and `--out.filename` k4run CLI overrides — these
+  flag names are derived from those instance names.
+- `card_<>.xml` — the DD4hep compact detector geometry (e.g. from
+  [k4geo](https://github.com/key4hep/k4geo)), passed to ddsim's `--compactFile`
+- `ddsim_<>.py` — a ddsim steering file (a starting point can be generated with `ddsim --dumpSteeringFile`)
+
+Unlike `whizard`/`madgraph`, there is no reconstruction stage — `pythia8_fullsim` stops at ddsim's raw
+simulated-hit output.
+
 
 ## Mixed Production
 

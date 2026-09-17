@@ -83,3 +83,31 @@ pythia8 :
       - ++.cmd
       - ().root
     output_file : $$.root
+
+# pythia8_fullsim runs a full Geant4/DD4hep simulation (via ddsim) instead of the
+# parameterised Delphes response used by "pythia8" above. It stops at the raw simulated-hit
+# EDM4hep output; digitisation/reconstruction is not included (see README).
+#
+#   stage1: k4run_pythia8_<>.py is an analyst-supplied k4run/Gaudi steering script (based on
+#           the key4hep k4Gen Pythia8 example) that generates Pythia8 events and writes them
+#           to an EDM4hep ROOT file. The datatype's ++.cmd pythia8 card is passed via the
+#           --Pythia8.PythiaInterface.pythiacard override (the instance names must match
+#           those used in k4run_pythia8_<>.py).
+#   stage2: ddsim runs the full Geant4 simulation over those generator-level events against
+#           the card_<>.xml DD4hep detector model, using the ddsim_<>.py steering file.
+pythia8_fullsim :
+  stage1:
+    cmd : k4run {0} -n -1 --Pythia8.PythiaInterface.pythiacard {1} --out.filename {2}
+    args:
+      - k4run_pythia8_<>.py
+      - ++.cmd
+      - ().root
+    output_file: genevents.root
+  stage2:
+    cmd : ddsim -I {0} -N -1 -O {1} --compactFile $(readlink -f {2}) --steeringFile {3}
+    args:
+      - --
+      - ().root
+      - card_<>.xml
+      - ddsim_<>.py
+    output_file : $$.root
