@@ -70,16 +70,7 @@ class MadgraphMethods:
 
 
 class K4RunMethods:
-    """
-    This class contains the methods required to run k4run-based stages (e.g. CLD
-    reconstruction) for MC generation.
-
-    These methods match those inside production_types.yaml.
-
-    This class is intended to be inherited by the MCProductionBaseTask. This is to avoid polluting
-    the base task with too many methods.
-
-    """
+    """Methods required to run k4run-based stages (e.g. CLD reconstruction) for MC generation."""
 
     @property
     def tmp_output_parent_dir(self):
@@ -90,12 +81,7 @@ class K4RunMethods:
         raise NotImplementedError
 
     def cp_sandbox_files(self):
-        """
-        k4run steering scripts such as CLDConfig's CLDReconstruction.py depend on sibling
-        files/directories (e.g. py_utils.py, Tracking/, PandoraSettingsCLD/) being present
-        in the working directory. This symlinks the contents of the configured
-        `k4run_sandbox` directory into the stage's working directory.
-        """
+        """Symlinks the `k4run_sandbox` directory's contents into the stage's working directory."""
         sandbox_path = get_setting("dataprod_config").k4run_sandbox
         if not sandbox_path:
             return
@@ -106,11 +92,7 @@ class K4RunMethods:
                 link.symlink_to(path)
 
     def cld_reco_rename_output(self):
-        """
-        CLDReconstruction.py always names its EDM4hep output `{outputBasename}_REC.edm4hep.root`
-        (see CLDConfig's py_utils.py:_create_writer_edm4hep), which does not match FLARE's own
-        computed output_file_name. Rename the produced file to match once the stage completes.
-        """
+        """Renames CLDReconstruction.py's fixed "<outputBasename>_REC.edm4hep.root" to FLARE's expected output_file_name."""
         produced = self.tmp_output_parent_dir / f"{self.datatype}_REC.edm4hep.root"
         target = self.tmp_output_parent_dir / self.output_file_name
         if produced != target:

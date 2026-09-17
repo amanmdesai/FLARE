@@ -25,12 +25,9 @@ class BracketMappings:
     `free_name` = <>
         Denotes where the analyst can take liberties with their naming convention
     `datatype_parameter_stem` = +stem+
-        Resolves to the datatype itself, with no associated input file lookup. Used by
-        commands (e.g. k4run reconstruction) that need the datatype as a bare string argument.
+        Resolves to the datatype itself as a bare string, with no file lookup
     `free_name_use_copied_output` = <?>
-        Like `free_name`, but the matched file is copied into the stage's working directory
-        and that copied path (rather than the original) is used as the cmd argument. Used for
-        e.g. k4run steering/sandbox files that must be run from the working directory.
+        Like `free_name`, but resolves to the matched file's copy in the working directory
 
     Methods
     ---------
