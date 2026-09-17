@@ -24,6 +24,13 @@ class BracketMappings:
         during runtime
     `free_name` = <>
         Denotes where the analyst can take liberties with their naming convention
+    `datatype_parameter_stem` = +stem+
+        Resolves to the datatype itself, with no associated input file lookup. Used by
+        commands (e.g. k4run reconstruction) that need the datatype as a bare string argument.
+    `free_name_use_copied_output` = <?>
+        Like `free_name`, but the matched file is copied into the stage's working directory
+        and that copied path (rather than the original) is used as the cmd argument. Used for
+        e.g. k4run steering/sandbox files that must be run from the working directory.
 
     Methods
     ---------
@@ -37,6 +44,8 @@ class BracketMappings:
     datatype_parameter = "++"
     free_name = "<>"
     b2luigi_detemined_parameter = "$$"
+    datatype_parameter_stem = "+stem+"
+    free_name_use_copied_output = "<?>"
 
     @staticmethod
     def determine_bracket_mapping(arg: str) -> Union[str, None]:
@@ -64,7 +73,9 @@ def _strip(arg, mapping: BracketMappings):
     This method does nothing more than strip the free name
     brackets from the argument
     """
-    return arg.replace(mapping[0], "").replace(mapping[1], "")
+    for char in mapping:
+        arg = arg.replace(char, "")
+    return arg
 
 
 def check_if_path_matches_mapping(
@@ -110,6 +121,12 @@ class BracketMappingCMDBuilderMixin:
     def bm_free_name(self, arg: str) -> Path:
         raise NotImplementedError
 
+    def bm_datatype_parameter_stem(self, arg: str) -> Path:
+        raise NotImplementedError
+
+    def bm_free_name_use_copied_output(self, arg: str) -> Path:
+        raise NotImplementedError
+
     def bm_b2luigi_determined_parameter(self, arg: str) -> Path:
         raise NotImplementedError
 
@@ -139,6 +156,13 @@ class BracketMappingCMDBuilderMixin:
             elif mapping == BracketMappings.free_name:
                 # Find the associated file using the check_if_path_maetches_mapping function
                 path = self.bm_free_name(arg=arg)
+                cmd_inputs.append(str(path))
+            elif mapping == BracketMappings.datatype_parameter_stem:
+                path = self.bm_datatype_parameter_stem(arg=arg)
+                cmd_inputs.append(str(path))
+            elif mapping == BracketMappings.free_name_use_copied_output:
+                # Find the associated file and use its copy inside the working dir as the input
+                path = self.bm_free_name_use_copied_output(arg=arg)
                 cmd_inputs.append(str(path))
             elif mapping == BracketMappings.b2luigi_detemined_parameter:
                 path = self.bm_b2luigi_determined_parameter(arg=arg)

@@ -84,9 +84,10 @@ pythia8 :
       - ().root
     output_file : $$.root
 
-# pythia8_fullsim runs a full Geant4/DD4hep simulation (via ddsim) instead of the
-# parameterised Delphes response used by "pythia8" above. It stops at the raw simulated-hit
-# EDM4hep output; digitisation/reconstruction is not included (see README).
+# pythia8_fullsim runs a full Geant4/DD4hep simulation (via ddsim) and CLD reconstruction
+# instead of the parameterised Delphes response used by "pythia8" above. It uses the CLD
+# detector concept (not IDEA, used by "pythia8" above) because CLD is the only FCC-ee detector
+# with a shipped, turnkey reconstruction package (key4hep's CLDConfig) -- see README.
 #
 #   stage1: k4run_pythia8_<>.py is an analyst-supplied k4run/Gaudi steering script (based on
 #           the key4hep k4Gen Pythia8 example) that generates Pythia8 events and writes them
@@ -94,7 +95,14 @@ pythia8 :
 #           --Pythia8.PythiaInterface.pythiacard override (the instance names must match
 #           those used in k4run_pythia8_<>.py).
 #   stage2: ddsim runs the full Geant4 simulation over those generator-level events against
-#           the card_<>.xml DD4hep detector model, using the ddsim_<>.py steering file.
+#           the card_<>.xml CLD DD4hep detector model, using the ddsim_<>.py steering file
+#           (CLDConfig's cld_steer.py).
+#   stage3: k4run_cld_reco_<?>.py (CLDConfig's CLDReconstruction.py) reconstructs the simulated events
+#           against the same card_<>.xml detector model. It depends on sibling files (py_utils.py,
+#           Tracking/, PandoraSettingsCLD/, ...) that cp_sandbox_files symlinks in from the
+#           `k4run_sandbox` setting (point it at CLDConfig's share/CLDConfig directory).
+#           CLDReconstruction.py always names its output "<outputBasename>_REC.edm4hep.root",
+#           which cld_reco_rename_output renames to FLARE's expected output_file_name.
 pythia8_fullsim :
   stage1:
     cmd : k4run {0} -n -1 --Pythia8.PythiaInterface.pythiacard {1} --out.filename {2}
@@ -110,4 +118,16 @@ pythia8_fullsim :
       - ().root
       - card_<>.xml
       - ddsim_<>.py
+    output_file : CLD_SIM.edm4hep.root
+  stage3:
+    cmd : k4run {0} --inputFiles {1} --outputBasename {2} --compactFile $(readlink -f {3}) --cms 240
+    args:
+      - k4run_cld_reco_<?>.py
+      - --
+      - +stem+
+      - card_<>.xml
     output_file : $$.root
+    pre_run:
+      - cp_sandbox_files
+    on_completion:
+      - cld_reco_rename_output

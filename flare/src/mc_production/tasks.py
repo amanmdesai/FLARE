@@ -10,7 +10,10 @@ import b2luigi as luigi
 from b2luigi.core.utils import flatten_to_dict
 from typing_extensions import Union
 
-from flare.src.mc_production.generator_specific_methods import MadgraphMethods
+from flare.src.mc_production.generator_specific_methods import (
+    K4RunMethods,
+    MadgraphMethods,
+)
 from flare.src.mc_production.mc_production_types import get_mc_production_types
 from flare.src.utils.bracket_mappings import (
     BracketMappingCMDBuilderMixin,
@@ -25,7 +28,10 @@ logger = logging.getLogger("luigi-interface")
 
 
 class MCProductionBaseTask(
-    luigi.DispatchableTask, BracketMappingCMDBuilderMixin, MadgraphMethods
+    luigi.DispatchableTask,
+    BracketMappingCMDBuilderMixin,
+    MadgraphMethods,
+    K4RunMethods,
 ):
     """
     This base class is total generalised to be able to run on any N-stage MC production
@@ -118,7 +124,7 @@ class MCProductionBaseTask(
         else:
             return self._unparsed_output_file_name
 
-    def copy_input_file_to_output_dir(self, path):
+    def copy_input_file_to_output_dir(self, path, return_destination=False):
         """
         This function serves to copy a file from analysis/mc_production/ to
         the tmp output dir for historical book keeping
@@ -127,6 +133,8 @@ class MCProductionBaseTask(
         self.tmp_output_parent_dir.mkdir(parents=True, exist_ok=True)
         destination = self.tmp_output_parent_dir / source.name
         shutil.copy(source, destination)
+        if return_destination:
+            return destination
 
     def get_file_paths(self):
         return luigi.get_setting("dataprod_dir").glob("*")
@@ -153,6 +161,15 @@ class MCProductionBaseTask(
         return self._find_file_path_given_arg_and_bracketmapping(
             arg=arg, bracket_mapping=BracketMappings.free_name
         )
+
+    def bm_datatype_parameter_stem(self, arg) -> str:
+        return self.datatype
+
+    def bm_free_name_use_copied_output(self, arg) -> Path:
+        path = self._find_file_path_given_arg_and_bracketmapping(
+            arg=arg, bracket_mapping=BracketMappings.free_name_use_copied_output
+        )
+        return self.copy_input_file_to_output_dir(path, return_destination=True)
 
     def _find_file_path_given_arg_and_bracketmapping(
         self, arg: str, bracket_mapping: BracketMappings

@@ -2,6 +2,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from b2luigi import get_setting
+
 
 class MadgraphMethods:
     """
@@ -65,3 +67,51 @@ class MadgraphMethods:
         shutil.copyfile(
             self.input_file_path, dst=f"{self.tmp_output_parent_dir}/{input_file_name}"
         )
+
+
+class K4RunMethods:
+    """
+    This class contains the methods required to run k4run-based stages (e.g. CLD
+    reconstruction) for MC generation.
+
+    These methods match those inside production_types.yaml.
+
+    This class is intended to be inherited by the MCProductionBaseTask. This is to avoid polluting
+    the base task with too many methods.
+
+    """
+
+    @property
+    def tmp_output_parent_dir(self):
+        raise NotImplementedError
+
+    @property
+    def output_file_name(self):
+        raise NotImplementedError
+
+    def cp_sandbox_files(self):
+        """
+        k4run steering scripts such as CLDConfig's CLDReconstruction.py depend on sibling
+        files/directories (e.g. py_utils.py, Tracking/, PandoraSettingsCLD/) being present
+        in the working directory. This symlinks the contents of the configured
+        `k4run_sandbox` directory into the stage's working directory.
+        """
+        sandbox_path = get_setting("dataprod_config").k4run_sandbox
+        if not sandbox_path:
+            return
+
+        for path in Path(sandbox_path).glob("*"):
+            link = self.tmp_output_parent_dir / path.relative_to(sandbox_path)
+            if not link.exists():
+                link.symlink_to(path)
+
+    def cld_reco_rename_output(self):
+        """
+        CLDReconstruction.py always names its EDM4hep output `{outputBasename}_REC.edm4hep.root`
+        (see CLDConfig's py_utils.py:_create_writer_edm4hep), which does not match FLARE's own
+        computed output_file_name. Rename the produced file to match once the stage completes.
+        """
+        produced = self.tmp_output_parent_dir / f"{self.datatype}_REC.edm4hep.root"
+        target = self.tmp_output_parent_dir / self.output_file_name
+        if produced != target:
+            produced.rename(target)
