@@ -84,7 +84,7 @@ pythia8 :
       - ().root
     output_file : $$.root
 
-# pythia8_fullsim: k4run Pythia8 gen -> ddsim CLD full sim -> CLDReconstruction.py; uses CLD (not IDEA) since it's the only FCC-ee detector with a shipped reconstruction package. Neither k4run's -n nor ddsim's -N are passed (both hang/error on -1 for these readers); the steering scripts determine event counts from the input file instead.
+# pythia8_fullsim: k4run Pythia8 gen -> ddsim CLD sim -> CLDReconstruction.py (CLD, not IDEA)
 pythia8_fullsim :
   stage1:
     cmd : k4run {0} --Pythia8.PythiaInterface.pythiacard {1} --out.filename {2}

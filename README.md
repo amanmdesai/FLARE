@@ -271,17 +271,8 @@ Where <> indicates areas where you can input your own naming conventions. The so
 
 ## Pythia8 (full simulation)
 
-**Note:** `pythia8_fullsim` runs a full Geant4/DD4hep simulation and reconstruction (via `k4run` + `ddsim` +
-`k4run` again) instead of the parameterised Delphes response used by `pythia8` above. It uses the **CLD**
-detector concept, not IDEA (used by `pythia8` above) — CLD is the only FCC-ee detector with a shipped, turnkey
-reconstruction package (key4hep's `CLDConfig`); IDEA has no equivalent, so its full-sim results are not
-directly comparable to an IDEA-based `pythia8` fastsim run of the same process.
-
-### details.yaml
-
-To select it, set `prodtype = pythia8_fullsim`. The same `.cmd` cards used for `pythia8` can be reused unchanged
-(the datatype naming rules are identical). You must also set `k4run_sandbox` to the `share/CLDConfig` directory
-of your key4hep install (needed by stage3, see below):
+**Note:** `pythia8_fullsim` runs a full Geant4/DD4hep simulation and reconstruction (`k4run` + `ddsim` + `k4run`) using the **CLD** detector, not IDEA.
+Set `prodtype = pythia8_fullsim`, reuse `pythia8`'s `.cmd` cards, and set `k4run_sandbox` to key4hep's `share/CLDConfig` directory and `global_env_script_path` to its `setup.sh` (don't source it yourself before running `flare`):
 
 ``` yaml
 "$model" : "UserMCProdConfigModel"
@@ -295,40 +286,7 @@ datatype:
     - p8_ee_mumuH_HWW_ecm240
 ```
 
-`global_env_script_path` (a file inside `mc_production`, e.g. a symlink to key4hep's `setup.sh`) is required —
-without it, `k4run`/`ddsim` are not on `PATH` for the subprocess FLARE launches. Do **not** source that
-environment yourself before running `flare`: sourcing a full key4hep stack (Python 3.11, its own
-`typing_extensions`) ahead of FLARE's own venv (Python 3.9) breaks FLARE's own imports. FLARE sources it only
-around each stage's subprocess call, per `dataprod_env_script`/`get_sourced_env`.
-
-### Input Files
-
-To run the `pythia8_fullsim` workflow the following files must be located in `mc_production`:
-
-- `++.cmd` — the same per-datatype Pythia8 card used by `pythia8` (see above)
-- `k4run_pythia8_<>.py` — a k4run/Gaudi steering script that generates Pythia8 events and writes them to
-  an EDM4hep ROOT file. It must instantiate its Pythia8 generator algorithm/tool and output writer with the
-  same names as the [official key4hep k4Gen example](https://github.com/key4hep/k4Gen) (`GenAlg("Pythia8")`
-  wrapping a `PythiaInterface()`, and `PodioOutput("out")`), since FLARE drives the card path and output
-  filename via the `--Pythia8.PythiaInterface.pythiacard` and `--out.filename` k4run CLI overrides — these
-  flag names are derived from those instance names. **It must also read the event count from the card itself**
-  (`Main:numberOfEvents`) rather than trust `-n`/`--num-events`: that flag sets `ApplicationMgr().EvtMax`
-  directly, unrelated to the card, and `-1` ("unlimited") makes a generator — which has no finite input to
-  exhaust, unlike ddsim reading a file — run forever. FLARE never passes `-n` to this stage; the packaged
-  template script (see `FCCee_Project_PPR/1_FCC_Software/A_MC_Generation/fullsim/mc_production/k4run_pythia8_producer.py`)
-  parses `sys.argv` for the CLI-overridden card path and sets `EvtMax` from it directly.
-- `card_<>.xml` — the CLD DD4hep compact detector geometry (e.g. `FCCee/CLD/compact/CLD_o2_v07/CLD_o2_v07.xml`
-  from [k4geo](https://github.com/key4hep/k4geo)), passed to both ddsim's and the reconstruction's
-  `--compactFile`. Symlink it in rather than copying — `--compactFile $(readlink -f ...)` resolves the symlink
-  so the file's sibling `<include>`s (elements.xml, materials.xml, ...) are still found relative to its real
-  location.
-- `ddsim_<>.py` — a ddsim steering file paired with the compact geometry version above (e.g. CLDConfig's
-  `cld_steer.py`; a generic starting point can be generated with `ddsim --dumpSteeringFile`, but it won't match
-  what the reconstruction stage expects as closely)
-- `k4run_cld_reco_<?>.py` — CLDConfig's `CLDReconstruction.py`, symlinked in (again so its `--compactFile`
-  argument resolves correctly). It depends on sibling files (`py_utils.py`, `Tracking/`, `PandoraSettingsCLD/`,
-  ...) that `cp_sandbox_files` symlinks into the stage's working directory from the `k4run_sandbox` setting —
-  point that at CLDConfig's whole `share/CLDConfig` directory, not just the script.
+`mc_production` needs: `++.cmd`, `k4run_pythia8_<>.py` (k4Gen-style steering script), `card_<>.xml` (CLD compact geometry, symlinked), `ddsim_<>.py`, and `k4run_cld_reco_<?>.py` (CLDConfig's `CLDReconstruction.py`, symlinked).
 
 
 ## Mixed Production
