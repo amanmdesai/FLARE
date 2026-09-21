@@ -1,5 +1,4 @@
 import logging
-import os
 import shutil
 import subprocess
 from functools import lru_cache
@@ -21,6 +20,7 @@ from flare.src.utils.bracket_mappings import (
     check_if_path_matches_mapping,
     get_suffix_from_arg,
 )
+from flare.src.utils.env import get_dataprod_env_script, get_sourced_env
 from flare.src.utils.tasks import OutputMixin, _linear_task_workflow_generator
 from flare.src.utils.yaml import get_config
 
@@ -46,15 +46,7 @@ class MCProductionBaseTask(
 
     @property
     def dataprod_env_script(self) -> Union[None, str]:
-        global_env_script_path = luigi.get_setting(
-            "dataprod_config"
-        ).global_env_script_path
-
-        if not global_env_script_path:
-            return
-
-        dataprod_dir = luigi.get_setting("dataprod_dir")
-        return dataprod_dir / global_env_script_path
+        return get_dataprod_env_script()
 
     @property
     def slurm_settings(self):
@@ -210,45 +202,6 @@ class MCProductionBaseTask(
             self.copy_input_file_to_output_dir(path)
             return path
 
-    def get_sourced_env(self, setup_script, extra_args="", preserve=None):
-        """
-        Run `source setup_script` in a bash subshell started with a
-        completely clean environment (env -i), so nothing from the
-        calling process's environment (LD_LIBRARY_PATH, PYTHONPATH,
-        PATH, etc.) leaks in and conflicts with what setup_script sets.
-        """
-        if setup_script is None:
-            return None
-
-        preserve = preserve or {}
-        base_preserved = {
-            "HOME": os.environ.get("HOME", ""),
-            "USER": os.environ.get("USER", ""),
-            "TERM": os.environ.get("TERM", "dumb"),
-        }
-        base_preserved.update(preserve)
-
-        preserved_exports = " ".join(f"{k}={v!r}" for k, v in base_preserved.items())
-
-        command = (
-            f"env -i {preserved_exports} "
-            f"bash -c 'source {setup_script} {extra_args} && env -0'"
-        )
-
-        output = subprocess.check_output(
-            ["bash", "-c", command],
-            env={},  # belt-and-suspenders: don't inherit here either
-            universal_newlines=False,
-        )
-
-        env = {}
-        for line in output.split(b"\0"):
-            if not line:
-                continue
-            key, _, value = line.partition(b"=")
-            env[key.decode()] = value.decode()
-        return env
-
     def process(self):
         """
         This process function essentially acts as the `run` function for a dispatchable task.
@@ -267,7 +220,7 @@ class MCProductionBaseTask(
             self.prod_cmd,
             cwd=self.tmp_output_parent_dir,
             shell=True,
-            env=self.get_sourced_env(self.dataprod_env_script),
+            env=get_sourced_env(self.dataprod_env_script),
         )
         # Run any required on_completion methods for this specific stage for this specific prodtype
         self.on_completion()

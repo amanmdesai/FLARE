@@ -9,6 +9,7 @@ from flare.src.fcc_analysis.dag_tooling.discovery import get_python_script_for_t
 from flare.src.fcc_analysis.task_registry import RegisteredFlareTask
 from flare.src.utils.bracket_mappings import BracketMappingCMDBuilderMixin
 from flare.src.utils.dirs import find_file
+from flare.src.utils.env import get_dataprod_env_script, get_sourced_env
 from flare.src.utils.jinja2_utils import get_template
 
 logger = logging.getLogger("luigi-interface")
@@ -211,8 +212,13 @@ class FCCAnalysisBaseClass(
         logger.info(f"Command to be ran \n\n {self.prod_cmd} \n\n")
         # Run any required pre_run methods for this specific stage for this specific prodtype
         self.pre_run()
-        # Run the prod cmd
-        subprocess.check_call(self.prod_cmd, cwd=self.outputDir, shell=True)
+        # Run the prod cmd, sourcing the mc_production env script (if any) so fccanalysis is on PATH
+        subprocess.check_call(
+            self.prod_cmd,
+            cwd=self.outputDir,
+            shell=True,
+            env=get_sourced_env(get_dataprod_env_script()),
+        )
         # Run any required on_completion methods for this specific stage for this specific prodtype
         self.on_completion()
 

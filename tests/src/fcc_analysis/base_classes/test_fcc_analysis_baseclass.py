@@ -232,7 +232,7 @@ def test_FCCAnalysisBaseClass_run_fcc_analysis_stage(mocker, registered_flare_ta
 
     mock_pre_run.assert_called_once()
     mock_subprocess.assert_called_once_with(
-        test_instance.prod_cmd, cwd=test_instance.outputDir, shell=True
+        test_instance.prod_cmd, cwd=test_instance.outputDir, shell=True, env=None
     )
     mock_on_completion.assert_called_once()
 
