@@ -288,6 +288,8 @@ datatype:
 
 `mc_production` needs: `++.cmd`, `k4run_pythia8_<>.py` (k4Gen-style steering script), `card_<>.xml` (CLD compact geometry, symlinked), `ddsim_<>.py`, and `k4run_cld_reco_<?>.py` (CLDConfig's `CLDReconstruction.py`, symlinked).
 
+FLARE-compatible versions of these scripts (event count read from the card/input file instead of `-n`/`-N`/`--num-events`) are on the `flare_compatible` branches of [amanmdesai/k4Gen](https://github.com/amanmdesai/k4Gen/tree/flare_compatible) (`k4Gen/options/k4run_pythia8_producer.py`) and [amanmdesai/CLDConfig](https://github.com/amanmdesai/CLDConfig/tree/flare_compatible) (`CLDConfig/ddsim_CLD.py`, `CLDConfig/k4run_cld_reco.py`). Copy them into `mc_production` (names already match `k4run_pythia8_<>.py`, `ddsim_<>.py`, `k4run_cld_reco_<?>.py`);
+
 
 ## Mixed Production
 
