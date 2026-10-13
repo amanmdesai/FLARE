@@ -10,6 +10,8 @@ from flare.src.pydantic_models.utils import ForbidExtraBaseModel
 # the MCProductionModel pydantic model. There is no point importing the production_types.yaml
 # As this is dependent on the MCProductionModel anyway. And so we keep it centralised there
 VALID_PRODTYPES = ("default", *tuple(MCProductionModel.__fields__.keys()))
+# Prodtypes whose input cards FLARE knows how to reseed per job (Pythia8 .cmd and Delphes .tcl)
+SEEDABLE_PRODTYPES = ("pythia8", "pythia8_fullsim")
 
 
 class UserMCProdConfigModel(ForbidExtraBaseModel):
@@ -26,6 +28,30 @@ class UserMCProdConfigModel(ForbidExtraBaseModel):
     card: List[str] = Field(default=["default"])
     edm4hep: List[str] = Field(default=["default"])
     k4run_sandbox: str = Field(default="")
+    seeds_file: str = Field(default="")
+    n_seeds: int = Field(default=0, ge=0)
+    events_per_seed: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    @classmethod
+    def check_seeding(cls, model):
+        if not model.seeds_file:
+            assert not (
+                model.n_seeds or model.events_per_seed
+            ), "n_seeds and events_per_seed require a seeds_file to be set"
+            return model
+
+        if model.global_prodtype != "default":
+            prodtypes = {model.global_prodtype}
+        else:
+            prodtypes = {
+                val["prodtype"] for item in model.datatype for val in item.values()
+            }
+        unsupported = prodtypes - set(SEEDABLE_PRODTYPES)
+        assert (
+            not unsupported
+        ), f"seeds_file is only supported for {SEEDABLE_PRODTYPES}, not {sorted(unsupported)}"
+        return model
 
     @model_validator(mode="after")
     @classmethod

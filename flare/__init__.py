@@ -40,7 +40,7 @@ def process(*args, flare_args, from_cli_input=False, **kwargs):
             kwargs["batch"] = True
 
     if not kwargs.get("workers", None):
-        kwargs["workers"] = 20
+        kwargs["workers"] = get_setting("workers", default=20)
     _process(*args, **kwargs)
 
 

@@ -35,7 +35,6 @@ def run_mcproduction(args):
 
     flare.process(
         MCProductionWrapper(prodtype=config.global_prodtype),
-        workers=20,
         batch=True,
         ignore_additional_command_line_args=True,
         flare_args=args,

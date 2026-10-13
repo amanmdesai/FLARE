@@ -15,6 +15,7 @@ class FlareTask(ForbidExtraBaseModel):
     output_file: str
     on_completion: Optional[List[str]] = Field(default_factory=list)
     pre_run: Optional[List[str]] = Field(default_factory=list)
+    seed_args: Optional[str] = Field(default="")
     requires: Optional[str] = Field(
         default_factory=str,
     )

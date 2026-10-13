@@ -35,6 +35,8 @@
 #   Each stage MUST have a cmd, list of args and an outputfile. If required,
 #   you can also define pre_run and on_completion lists that have the name
 #   of a function to be run that is a
+#   seed_args is appended to the cmd, with {seed} filled in, only when
+#   running one job per seed (seeds_file in the user's MC production yaml)
 #
 # ####################################################################
 
@@ -101,6 +103,7 @@ pythia8_fullsim :
       - card_<>.xml
       - ddsim_<>.py
     output_file : CLD_SIM.edm4hep.root
+    seed_args : --random.seed {seed} --meta.runNumberOffset {seed}
   stage3:
     cmd : k4run {0} --inputFiles {1} --outputBasename {2} --compactFile $(readlink -f {3}) --cms 240
     args:

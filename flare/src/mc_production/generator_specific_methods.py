@@ -1,3 +1,4 @@
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -97,3 +98,57 @@ class K4RunMethods:
         target = self.tmp_output_parent_dir / self.output_file_name
         if produced != target:
             produced.rename(target)
+
+
+class SeedMethods:
+    """Methods required to run one MC production job per seed listed in the `seeds_file`."""
+
+    @property
+    def tmp_output_parent_dir(self):
+        raise NotImplementedError
+
+    def seed_input_file(self, path):
+        """Writes a copy of a Pythia8 (.cmd) or Delphes (.tcl) card carrying this task's seed to the working directory."""
+        seed = getattr(self, "seed", None)
+        if seed is None:
+            return path
+
+        source = Path(path)
+        text = source.read_text()
+        if source.suffix == ".cmd":
+            seeded = reseed_pythia8_card(
+                text, seed, get_setting("dataprod_config").events_per_seed
+            )
+        elif source.suffix == ".tcl":
+            seeded = re.sub(
+                r"^(\s*set\s+RandomSeed\s+)\S+", rf"\g<1>{seed}", text, flags=re.M
+            )
+        else:
+            return path
+
+        if seeded == text:
+            return path
+
+        destination = self.tmp_output_parent_dir / source.name
+        destination.write_text(seeded)
+        return destination
+
+
+def reseed_pythia8_card(text, seed, n_events=0):
+    """Sets `Random:seed` (and `Main:numberOfEvents` if `n_events`) in a Pythia8 card, appending any that are missing."""
+    settings = {
+        "random:setseed": "Random:setSeed = on",
+        "random:seed": f"Random:seed = {seed}",
+    }
+    if n_events:
+        settings["main:numberofevents"] = f"Main:numberOfEvents = {n_events}"
+
+    lines, seen = [], set()
+    for line in text.splitlines():
+        key = line.split("!", 1)[0].split("=", 1)[0].strip().lower()
+        if key in settings:
+            seen.add(key)
+            line = settings[key]
+        lines.append(line)
+    lines += [value for key, value in settings.items() if key not in seen]
+    return "\n".join(lines) + "\n"

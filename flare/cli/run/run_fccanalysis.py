@@ -32,7 +32,6 @@ def run_analysis(args):
     ), "No FCC Stages have been detected in your study directory"
     flare.process(
         FCCAnalysisWrapper(),
-        workers=20,
         batch=True,
         ignore_additional_command_line_args=True,
         flare_args=args,

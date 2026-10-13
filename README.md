@@ -290,6 +290,20 @@ datatype:
 
 FLARE-compatible versions of these scripts (event count read from the card/input file instead of `-n`/`-N`/`--num-events`) are on the `flare_compatible` branches of [amanmdesai/k4Gen](https://github.com/amanmdesai/k4Gen/tree/flare_compatible) (`k4Gen/options/k4run_pythia8_producer.py`) and [amanmdesai/CLDConfig](https://github.com/amanmdesai/CLDConfig/tree/flare_compatible) (`CLDConfig/ddsim_CLD.py`, `CLDConfig/k4run_cld_reco.py`). Copy them into `mc_production` (names already match `k4run_pythia8_<>.py`, `ddsim_<>.py`, `k4run_cld_reco_<?>.py`);
 
+## Seeded Parallel Production
+
+For `pythia8` and `pythia8_fullsim`, FLARE can split each datatype into one batch job per random seed. Add a seeds file (whitespace-separated integers in `[1, 900000000]`, `#` starts a comment) to `mc_production` and point to it:
+
+``` yaml
+seeds_file: seeds.txt   # relative to mc_production
+n_seeds: 5              # optional, use only the first 5 seeds (default: all)
+events_per_seed: 100    # optional, overrides Main:numberOfEvents in the .cmd card
+```
+
+Each job gets its own copy of the Pythia8 card (`Random:seed`, `Main:numberOfEvents`) and Delphes card (`set RandomSeed`), and for `pythia8_fullsim` `ddsim` also gets `--random.seed` and `--meta.runNumberOffset`. Outputs land in `.../datatype=<datatype>/seed=<seed>/...`; `MCProductionWrapper` symlinks them into one directory per datatype, which FCCAnalyses reads as a single sample.
+
+Raising `n_seeds` reuses the MC jobs already done, but already-complete analysis stages are not rerun, so delete their outputs to include the new seeds. `events_per_seed` is not part of the output path, and lowering `n_seeds` leaves the extra links in place, so change `version` for either. Set `workers` in the config YAML (default 20) to control how many jobs FLARE keeps in flight.
+
 
 ## Mixed Production
 

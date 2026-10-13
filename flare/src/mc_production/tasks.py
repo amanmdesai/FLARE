@@ -12,6 +12,7 @@ from typing_extensions import Union
 from flare.src.mc_production.generator_specific_methods import (
     K4RunMethods,
     MadgraphMethods,
+    SeedMethods,
 )
 from flare.src.mc_production.mc_production_types import get_mc_production_types
 from flare.src.utils.bracket_mappings import (
@@ -26,12 +27,43 @@ from flare.src.utils.yaml import get_config
 
 logger = logging.getLogger("luigi-interface")
 
+SEEDS_MANIFEST = "seeds.txt"
+PYTHIA8_MAX_SEED = 900_000_000
+
+
+def get_seeds() -> list:
+    """
+    Returns the first `n_seeds` (all if 0) seeds of the `seeds_file` in the mc_production directory,
+    or an empty list if no `seeds_file` is set. Seeds are whitespace separated, `#` starts a comment
+    """
+    config = luigi.get_setting("dataprod_config", default={})
+    seeds_file = getattr(config, "seeds_file", "")
+    if not seeds_file:
+        return []
+
+    path = luigi.get_setting("dataprod_dir") / seeds_file
+    seeds = [
+        int(seed)
+        for line in path.read_text().splitlines()
+        for seed in line.split("#", 1)[0].split()
+    ]
+    assert config.n_seeds <= len(
+        seeds
+    ), f"n_seeds = {config.n_seeds} but {path} only has {len(seeds)} seeds"
+    seeds = seeds[: config.n_seeds or None]
+    assert len(set(seeds)) == len(seeds), f"{path} contains duplicate seeds"
+    assert all(
+        0 < seed <= PYTHIA8_MAX_SEED for seed in seeds
+    ), f"Seeds in {path} must be within [1, {PYTHIA8_MAX_SEED}] (Pythia8 Random:seed range)"
+    return seeds
+
 
 class MCProductionBaseTask(
     luigi.DispatchableTask,
     BracketMappingCMDBuilderMixin,
     MadgraphMethods,
     K4RunMethods,
+    SeedMethods,
 ):
     """
     This base class is total generalised to be able to run on any N-stage MC production
@@ -80,7 +112,11 @@ class MCProductionBaseTask(
         The cmd for this stage of the MC production as defined inside
         the production_types.yaml
         """
-        return self.stage_dict["cmd"].format(*self.collect_cmd_inputs())
+        cmd = self.stage_dict["cmd"].format(*self.collect_cmd_inputs())
+        seed = getattr(self, "seed", None)
+        if seed is not None and self.stage_dict.get("seed_args"):
+            cmd += " " + self.stage_dict["seed_args"].format(seed=seed)
+        return cmd
 
     @property
     def tmp_output_parent_dir(self):
@@ -145,13 +181,17 @@ class MCProductionBaseTask(
 
     def bm_datatype_parameter(self, arg) -> Path:
         arg = arg.replace(BracketMappings.datatype_parameter, self.datatype)
-        return self._find_file_path_given_arg_and_bracketmapping(
-            arg=arg, bracket_mapping=BracketMappings.datatype_parameter
+        return self.seed_input_file(
+            self._find_file_path_given_arg_and_bracketmapping(
+                arg=arg, bracket_mapping=BracketMappings.datatype_parameter
+            )
         )
 
     def bm_free_name(self, arg):
-        return self._find_file_path_given_arg_and_bracketmapping(
-            arg=arg, bracket_mapping=BracketMappings.free_name
+        return self.seed_input_file(
+            self._find_file_path_given_arg_and_bracketmapping(
+                arg=arg, bracket_mapping=BracketMappings.free_name
+            )
         )
 
     def bm_datatype_parameter_stem(self, arg) -> str:
@@ -189,7 +229,6 @@ class MCProductionBaseTask(
             if "card" in arg:
                 path = [p for p in file_path if self.card_name in Path(p).stem][0]
             elif "edm4hep" in arg:
-
                 path = [p for p in file_path if self.edm4hep_name in Path(p).stem][0]
             elif self.datatype in arg:
                 path = [p for p in file_path if self.datatype == Path(p).stem][0]
@@ -300,7 +339,38 @@ class MCProductionWrapper(OutputMixin, luigi.DispatchableTask):
     def inject_stage1_dependency_task(self) -> None:
         return None
 
+    @property
+    def seeded_links(self):
+        """
+        (source, link name) for each seed's output. Links are grouped into one directory per process,
+        which FCCAnalyses reads as a single sample
+        """
+        for task in self.requires():
+            name = Path(task.output_file_name)
+            source = task.get_output_file_name(task.output_file_name)
+            yield source, f"{name.stem}/{name.stem}_seed{task.seed}{name.suffix}"
+
+    def link_seeded_outputs(self):
+        # Symlink rather than copy, as copying every seed's output would double the disk usage
+        for source, name in self.seeded_links:
+            target = Path(self.get_output_file_name(name))
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.is_symlink():
+                target.unlink()
+            logger.info(f"Linking {source} -> {target}")
+            target.symlink_to(source)
+
+        events = luigi.get_setting("dataprod_config").events_per_seed
+        Path(self.get_output_file_name(SEEDS_MANIFEST)).write_text(
+            f"# events_per_seed: {events or 'as set in card'}\n"
+            + "\n".join(str(seed) for seed in get_seeds())
+            + "\n"
+        )
+
     def process(self):
+        if get_seeds():
+            self.link_seeded_outputs()
+            return
         # Copy the file and its metadata (hence copy2) to the output directory
         for input_file in self.input_paths:
             source = Path(input_file)
@@ -309,22 +379,31 @@ class MCProductionWrapper(OutputMixin, luigi.DispatchableTask):
             shutil.copy2(source, target)
 
     def output(self):
+        if get_seeds():
+            # The manifest must be the first output: the stage1 analysis takes the parent of its first input as inputDir
+            yield self.add_to_output(SEEDS_MANIFEST)
+            for _, name in self.seeded_links:
+                yield self.add_to_output(name)
+            return
+
         for input_file in self.input_paths:
             path = Path(input_file)
             yield self.add_to_output(path.name)
 
     def requires(self):
         dataprod_config = luigi.get_setting("dataprod_config")
+        seeds = get_seeds() or [None]
         # If the prodtype is default i.e wasn't defined globally
         # we must call the default_prodtype requires function
         if self.prodtype == "default":
             datatypes_dict = flatten_to_dict(dataprod_config.datatype)
             datatypes = list(datatypes_dict.keys())
 
-            for datatype, card, edm4hep in product(
+            for datatype, card, edm4hep, seed in product(
                 datatypes,
                 dataprod_config.card,
                 dataprod_config.edm4hep,
+                seeds,
             ):
                 prodtype = datatypes_dict[datatype]["prodtype"]
 
@@ -336,13 +415,15 @@ class MCProductionWrapper(OutputMixin, luigi.DispatchableTask):
                     datatype=datatype,
                     card_name=card,
                     edm4hep_name=edm4hep,
+                    **({} if seed is None else {"seed": seed}),
                 )
 
         else:
-            for datatype, card, edm4hep in product(
+            for datatype, card, edm4hep, seed in product(
                 dataprod_config.datatype,
                 dataprod_config.card,
                 dataprod_config.edm4hep,
+                seeds,
             ):
                 yield get_last_stage_task(
                     inject_stage1_dependency=self.inject_stage1_dependency_task
@@ -351,6 +432,7 @@ class MCProductionWrapper(OutputMixin, luigi.DispatchableTask):
                     datatype=datatype,
                     card_name=card,
                     edm4hep_name=edm4hep,
+                    **({} if seed is None else {"seed": seed}),
                 )
 
 
@@ -401,19 +483,25 @@ def get_mc_prod_stages_dict(inject_stage1_dependency=None, prodtype=None) -> dic
     )
     ```
     """
-    last_stage = next(reversed(_get_mc_prod_stages(prodtype=prodtype)))
+    stages = list(_get_mc_prod_stages(prodtype=prodtype))
     class_name = "MCProduction"
     class_name += prodtype.capitalize() if prodtype else ""
+    # Every stage needs the seed parameter, as clone() only passes on parameters the upstream task declares
+    class_attrs = {
+        stage: ({"seed": luigi.IntParameter()} if get_seeds() else {})
+        for stage in stages
+    }
+    class_attrs[stages[-1]].update(
+        {
+            "card_name": luigi.Parameter(default="default"),
+            "edm4hep_name": luigi.Parameter(default="default"),
+        }
+    )
     return _linear_task_workflow_generator(
-        stages=list(_get_mc_prod_stages(prodtype=prodtype)),
+        stages=stages,
         class_name=class_name,
         base_class=MCProductionBaseTask,
-        class_attrs={
-            last_stage: {
-                "card_name": luigi.Parameter(default="default"),
-                "edm4hep_name": luigi.Parameter(default="default"),
-            }
-        },
+        class_attrs=class_attrs,
         inject_stage1_dependency=inject_stage1_dependency,
     )
 
